@@ -17,21 +17,20 @@ class Browser:
             "--disable-webgl",
             "--disable-popup-blocking",
             "--enable-features=NetworkService",
-            "--enable-automation",
-            "--process-per-tab",
             "--allow-running-insecure-content",
-            "--no-first-run",
-            "--no-startup-window",
         ]
+        self.is_running = False
 
     async def _init_browser(self):
         self.browser = await pyppeteer.launch(
             headless=False, ignoreHTTPSErrors=True, args=self.args, dumpio=True
         )
+        self.is_running = True
         return self.browser
 
     async def _close_browser(self):
         await self.browser.close()
+        self.is_running = False
 
 
 class Page:
@@ -40,29 +39,29 @@ class Page:
         self.base_http = base_http
 
     async def _init_page(self):
-        page = await self.browser.newPage()
-        return page
+        self.page = await self.browser.newPage()
 
     async def close_dialog(self, dialog):
         await dialog.dismiss()
 
-    async def _close_page(self, page):
-        await page.close()
+    async def _close_page(self):
+        await self.page.close()
 
-    async def fetch(self, page):
+    async def fetch(self):
 
         try:
-            await page.setViewport(viewport={"width": 1920, "height": 4096})
-            await page.setUserAgent(
+            await self.page.setUserAgent(
                 userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.129 Safari/537.36"
             )
-            await page.goto(
-                url=self.url,
-                options={"waitUntil": ["networkidle2"], "timeout": 10 * 1000},
+            response = await self.page.goto(
+                url=self.base_http.get("url"),
+                options={"waitUntil": ["networkidle2"], "timeout": 30 * 1000},
             )
             await asyncio.sleep(10)
-            content = await page.content()
         except Exception:
-            content = ""
-        await self._close_page(page)
-        return content
+            import traceback
+
+            traceback.print_exc()
+            response = None
+        return response
+
